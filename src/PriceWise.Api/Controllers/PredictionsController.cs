@@ -22,7 +22,7 @@ public class PredictionsController : ControllerBase
 
         return Ok(new
         {
-            predictedPrice = price
+            predictor = _predictor.GetType().FullName
         });
     }
 }
