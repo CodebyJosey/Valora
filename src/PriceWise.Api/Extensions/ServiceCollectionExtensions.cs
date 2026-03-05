@@ -3,7 +3,6 @@ using PriceWise.Infrastructure.ML.Models;
 using Microsoft.Extensions.ML;
 using PriceWise.Infrastructure.ML.Prediction;
 using Microsoft.ML;
-using PriceWise.Api.ML;
 
 namespace PriceWise.Api.Extensions;
 
@@ -41,17 +40,17 @@ public static class ServiceCollectionExtensions
     /// </summary>
     /// <param name="services">Service collection.</param>
     /// <param name="env">Host environment used to resolve repo-root paths.</param>
-    public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IHostEnvironment env)
+    public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, string modelPath)
     {
-
         services.AddSingleton(new MLContext(seed: 1));
-        services.AddScoped<IPricePredictor, ApiPricePredictor>();
 
-        string repoRoot = Directory.GetParent(env.ContentRootPath)!.Parent!.FullName;
-        string modelPath = Path.Combine(repoRoot, "artifacts", "models", "laptop-price-model.zip");
+        services.AddSingleton<ITrainedModelProvider>(sp =>
+        {
+            MLContext? ml = sp.GetRequiredService<MLContext>();
+            return new FileTrainedModelProvider(ml, modelPath);
+        });
 
-        services.AddPredictionEnginePool<LaptopPriceTrainingRow, LaptopPricePrediction>()
-            .FromFile(modelName: "LaptopPriceModel", filePath: modelPath, watchForChanges: true);
+        services.AddScoped<IPricePredictor, MlNetPricePredictor>();
 
         return services;
     }

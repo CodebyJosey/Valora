@@ -4,7 +4,9 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApiServices();
 builder.Services.AddApplicationServices();
-builder.Services.AddInfrastructureServices(builder.Environment);
+string repoRoot = Directory.GetParent(builder.Environment.ContentRootPath)!.Parent!.FullName;
+string modelPath = Path.Combine(repoRoot, "artifacts", "models", "laptop-price-model.zip");
+builder.Services.AddInfrastructureServices(modelPath);
 
 WebApplication app = builder.Build();
 
