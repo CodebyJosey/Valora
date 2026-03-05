@@ -2,14 +2,14 @@ using PriceWise.Api.Extensions;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddApiServices();
 builder.Services.AddApplicationServices();
-builder.Services.AddInfrastructureServices();
+string repoRoot = Directory.GetParent(builder.Environment.ContentRootPath)!.Parent!.FullName;
+string modelPath = Path.Combine(repoRoot, "artifacts", "models", "laptop-price-model.zip");
+builder.Services.AddInfrastructureServices(modelPath);
 
 WebApplication app = builder.Build();
 
-// Configure middleware pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -17,9 +17,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();
+
+public partial class Program { }
