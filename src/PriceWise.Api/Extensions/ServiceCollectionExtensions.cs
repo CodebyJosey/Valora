@@ -32,6 +32,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPricePredictionCategoryRegistry, PricePredictionCategoryRegistry>();
 
         services.AddSingleton<ITrainedModelCatalog, FileTrainedModelCatalog>();
+        services.AddSingleton<IPriceTrainingMetadataStore>(provider =>
+            new FilePriceTrainingMetadataStore(
+                provider.GetRequiredService<IPricePredictionCategoryRegistry>(),
+                repoRootPath));
+
         services.AddSingleton<IPricePredictionService, MlPricePredictionService>();
         services.AddSingleton<IPriceTrainingService, MlPriceTrainingService>();
 

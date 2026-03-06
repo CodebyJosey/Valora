@@ -14,6 +14,7 @@ public sealed class MlPriceTrainingService : IPriceTrainingService
     private readonly IPricePredictionCategoryRegistry _categoryRegistry;
     private readonly IPriceWisePathResolver _pathResolver;
     private readonly ITrainedModelCatalog _trainedModelCatalog;
+    private readonly IPriceTrainingMetadataStore _metadataStore;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MlPriceTrainingService"/> class.
@@ -21,14 +22,17 @@ public sealed class MlPriceTrainingService : IPriceTrainingService
     /// <param name="categoryRegistry">The category registry.</param>
     /// <param name="pathResolver">The path resolver.</param>
     /// <param name="trainedModelCatalog">The trained model catalog.</param>
+    /// <param name="metadataStore">The training metadata store.</param>
     public MlPriceTrainingService(
         IPricePredictionCategoryRegistry categoryRegistry,
         IPriceWisePathResolver pathResolver,
-        ITrainedModelCatalog trainedModelCatalog)
+        ITrainedModelCatalog trainedModelCatalog,
+        IPriceTrainingMetadataStore metadataStore)
     {
         _categoryRegistry = categoryRegistry;
         _pathResolver = pathResolver;
         _trainedModelCatalog = trainedModelCatalog;
+        _metadataStore = metadataStore;
     }
 
     /// <inheritdoc />
@@ -76,7 +80,7 @@ public sealed class MlPriceTrainingService : IPriceTrainingService
 
         EnsureColumnExists(
             predictions.Schema,
-            "Price",
+            nameof(PriceTrainingResult.CategoryKey).Replace(nameof(PriceTrainingResult.CategoryKey), "Price"),
             "The transformed prediction schema does not contain the required label column 'Price'.");
 
         EnsureColumnExists(
@@ -93,7 +97,7 @@ public sealed class MlPriceTrainingService : IPriceTrainingService
 
         _trainedModelCatalog.Reload(categoryKey);
 
-        return new PriceTrainingResult
+        PriceTrainingResult result = new()
         {
             CategoryKey = category.Key,
             DatasetPath = datasetPath,
@@ -103,6 +107,20 @@ public sealed class MlPriceTrainingService : IPriceTrainingService
             MeanAbsoluteError = metrics.MeanAbsoluteError,
             MeanSquaredError = metrics.MeanSquaredError
         };
+
+        _metadataStore.Save(new PriceTrainingMetadata
+        {
+            CategoryKey = result.CategoryKey,
+            TrainedAtUtc = DateTime.UtcNow,
+            DatasetPath = result.DatasetPath,
+            ModelPath = result.ModelPath,
+            RSquared = result.RSquared,
+            RootMeanSquaredError = result.RootMeanSquaredError,
+            MeanAbsoluteError = result.MeanAbsoluteError,
+            MeanSquaredError = result.MeanSquaredError
+        });
+
+        return result;
     }
 
     private static void SaveModel(
