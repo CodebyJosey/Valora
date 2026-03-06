@@ -1,6 +1,7 @@
 ﻿using PriceWise.DatasetGenerator.Generators;
+using PriceWise.DatasetGenerator.Models;
 
-const int defaultCount = 1000;
+const int defaultCount = 2500;
 const int defaultSeed = 42;
 
 string repoRoot = Directory.GetParent(AppContext.BaseDirectory)!
@@ -26,7 +27,7 @@ if (args.Length >= 2 && int.TryParse(args[1], out int parsedSeed))
 }
 
 LaptopDatasetGenerator? generator = new LaptopDatasetGenerator();
-IReadOnlyList<PriceWise.DatasetGenerator.Models.LaptopDatasetRow> rows = generator.Generate(count, seed);
+IReadOnlyList<LaptopDatasetRow> rows = generator.Generate(count, seed);
 generator.WriteCsv(outputPath, rows);
 
 Console.WriteLine($"Generated {rows.Count} laptop rows.");

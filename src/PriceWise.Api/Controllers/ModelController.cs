@@ -4,6 +4,7 @@ using PriceWise.Infrastructure.ML.Models;
 using PriceWise.Infrastructure.ML.Training;
 using PriceWise.Infrastructure.ML.Prediction;
 using PriceWise.Infrastructure.ML.Definitions;
+using PriceWise.Domain.Entities;
 
 namespace PriceWise.Api.Controllers;
 
@@ -120,7 +121,7 @@ public sealed class ModelController : ControllerBase
     /// and reads the Score directly from an IDataView (very reliable).
     /// </summary>
     [HttpPost("sanity-predict")]
-    public IActionResult SanityPredict([FromBody] PredictPriceRequest request)
+    public IActionResult SanityPredict([FromBody] ProductFeatures request)
     {
         if (request is null)
         {
@@ -138,6 +139,11 @@ public sealed class ModelController : ControllerBase
             RamGb = request.RamGb,
             StorageGb = request.StorageGb,
             Gpu = request.Gpu.Trim().Replace(" ", ""),
+            ScreenSizeInch = request.ScreenSizeInch,
+            RefreshRate = request.RefreshRate,
+            ReleaseYear = request.ReleaseYear,
+            Condition = request.Condition.Trim(),
+            Segment = request.Segment.Trim(),
             Price = 0
         };
 
@@ -159,11 +165,4 @@ public sealed class ModelController : ControllerBase
     {
         public float Score { get; set; }
     }
-
-    public sealed record PredictPriceRequest(
-        string Brand,
-        string Cpu,
-        float RamGb,
-        float StorageGb,
-        string Gpu);
 }
