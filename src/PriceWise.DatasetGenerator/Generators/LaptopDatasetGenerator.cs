@@ -25,51 +25,29 @@ public sealed class LaptopDatasetGenerator
         "M1", "M2", "M3"
     };
 
-    private static readonly int[] RamOptions =
+    private static readonly string[] Conditions =
     {
-        8, 16, 32, 64
+        "New", "Refurbished", "UsedGood", "UsedFair"
     };
 
-    private static readonly int[] StorageOptions =
+    private static readonly string[] Segments =
     {
-        256, 512, 1024, 2048
+        "Budget", "Mainstream", "Gaming", "Ultrabook", "Workstation"
     };
 
-    private static readonly string[] IntegratedGpuOnly =
-    {
-        "Integrated"
-    };
-
-    private static readonly string[] StandardGpuOptions =
-    {
-        "Integrated", "RTX2050", "RTX3050", "RTX3060", "RTX4050", "RTX4060", "RTX4070"
-    };
-
-    private static readonly string[] HighEndGpuOptions =
-    {
-        "RTX3050", "RTX3060", "RTX4050", "RTX4060", "RTX4070", "RTX4080"
-    };
-
-    /// <summary>
-    /// Generates a collection of laptop rows.
-    /// </summary>
     public IReadOnlyList<LaptopDatasetRow> Generate(int count, int seed = 42)
     {
         Random? random = new Random(seed);
-        List<LaptopDatasetRow>? rows = new List<LaptopDatasetRow>(capacity: count);
+        List<LaptopDatasetRow>? rows = new List<LaptopDatasetRow>(count);
 
         for (int i = 0; i < count; i++)
         {
-            LaptopDatasetRow row = GenerateOne(random);
-            rows.Add(row);
+            rows.Add(GenerateOne(random));
         }
 
         return rows;
     }
 
-    /// <summary>
-    /// Writes the generated dataset to a CSV file.
-    /// </summary>
     public void WriteCsv(string outputPath, IEnumerable<LaptopDatasetRow> rows)
     {
         string? directory = Path.GetDirectoryName(outputPath);
@@ -80,7 +58,7 @@ public sealed class LaptopDatasetGenerator
         }
 
         StringBuilder? sb = new StringBuilder();
-        sb.AppendLine("Brand,Cpu,RamGb,StorageGb,Gpu,Price");
+        sb.AppendLine("Brand,Cpu,RamGb,StorageGb,Gpu,ScreenSizeInch,RefreshRate,ReleaseYear,Condition,Segment,Price");
 
         foreach (LaptopDatasetRow row in rows)
         {
@@ -89,6 +67,11 @@ public sealed class LaptopDatasetGenerator
               .Append(row.RamGb).Append(',')
               .Append(row.StorageGb).Append(',')
               .Append(row.Gpu).Append(',')
+              .Append(row.ScreenSizeInch.ToString(CultureInfo.InvariantCulture)).Append(',')
+              .Append(row.RefreshRate).Append(',')
+              .Append(row.ReleaseYear).Append(',')
+              .Append(row.Condition).Append(',')
+              .Append(row.Segment).Append(',')
               .Append(row.Price.ToString(CultureInfo.InvariantCulture))
               .AppendLine();
         }
@@ -99,10 +82,15 @@ public sealed class LaptopDatasetGenerator
     private static LaptopDatasetRow GenerateOne(Random random)
     {
         string brand = PickBrand(random);
-        string cpu = PickCpu(brand, random);
-        int ramGb = PickRam(cpu, brand, random);
-        int storageGb = PickStorage(cpu, ramGb, brand, random);
-        string gpu = PickGpu(brand, cpu, ramGb, random);
+        string segment = PickSegment(brand, random);
+        string cpu = PickCpu(brand, segment, random);
+        int ramGb = PickRam(brand, cpu, segment, random);
+        int storageGb = PickStorage(brand, cpu, ramGb, segment, random);
+        string gpu = PickGpu(brand, cpu, ramGb, segment, random);
+        float screenSize = PickScreenSize(segment, brand, random);
+        int refreshRate = PickRefreshRate(segment, gpu, random);
+        int releaseYear = PickReleaseYear(conditionBiasNew: segment is "Ultrabook" or "Workstation", random);
+        string condition = PickCondition(segment, random);
 
         decimal price = LaptopPricingRules.CalculatePrice(
             brand,
@@ -110,6 +98,11 @@ public sealed class LaptopDatasetGenerator
             ramGb,
             storageGb,
             gpu,
+            screenSize,
+            refreshRate,
+            releaseYear,
+            condition,
+            segment,
             random);
 
         return new LaptopDatasetRow
@@ -119,98 +112,201 @@ public sealed class LaptopDatasetGenerator
             RamGb = ramGb,
             StorageGb = storageGb,
             Gpu = gpu,
+            ScreenSizeInch = screenSize,
+            RefreshRate = refreshRate,
+            ReleaseYear = releaseYear,
+            Condition = condition,
+            Segment = segment,
             Price = price
         };
     }
 
     private static string PickBrand(Random random)
-    {
-        return Brands[random.Next(Brands.Length)];
-    }
+        => Brands[random.Next(Brands.Length)];
 
-    private static string PickCpu(string brand, Random random)
+    private static string PickSegment(string brand, Random random)
     {
         if (brand == "Apple")
         {
+            string[] appleSegments = { "Mainstream", "Ultrabook", "Workstation" };
+            return appleSegments[random.Next(appleSegments.Length)];
+        }
+
+        return Segments[random.Next(Segments.Length)];
+    }
+
+    private static string PickCpu(string brand, string segment, Random random)
+    {
+        if (brand == "Apple")
+        {
+            if (segment == "Workstation")
+            {
+                string[] highApple = { "M2", "M3" };
+                return highApple[random.Next(highApple.Length)];
+            }
+
             return AppleCpus[random.Next(AppleCpus.Length)];
+        }
+
+        if (segment == "Budget")
+        {
+            string[] low = { "i3", "i5" };
+            return low[random.Next(low.Length)];
+        }
+
+        if (segment == "Gaming" || segment == "Workstation")
+        {
+            string[] high = { "i5", "i7", "i9" };
+            return high[random.Next(high.Length)];
         }
 
         return IntelCpus[random.Next(IntelCpus.Length)];
     }
 
-    private static int PickRam(string cpu, string brand, Random random)
+    private static int PickRam(string brand, string cpu, string segment, Random random)
     {
         if (brand == "Apple")
         {
-            int[] appleRam = { 8, 16, 24, 32 };
+            int[] appleRam = segment switch
+            {
+                "Ultrabook" => new[] { 8, 16, 24 },
+                "Workstation" => new[] { 16, 24, 32 },
+                _ => new[] { 8, 16, 24 }
+            };
+
             return appleRam[random.Next(appleRam.Length)];
         }
 
+        int[] options = segment switch
+        {
+            "Budget" => new[] { 8, 16 },
+            "Mainstream" => new[] { 8, 16, 32 },
+            "Gaming" => new[] { 16, 32, 64 },
+            "Ultrabook" => new[] { 8, 16, 32 },
+            "Workstation" => new[] { 16, 32, 64 },
+            _ => new[] { 8, 16 }
+        };
+
         if (cpu == "i3")
         {
-            int[] low = { 8, 16 };
-            return low[random.Next(low.Length)];
+            options = new[] { 8, 16 };
         }
 
-        if (cpu == "i9")
-        {
-            int[] high = { 16, 32, 64 };
-            return high[random.Next(high.Length)];
-        }
-
-        return RamOptions[random.Next(RamOptions.Length)];
+        return options[random.Next(options.Length)];
     }
 
-    private static int PickStorage(string cpu, int ramGb, string brand, Random random)
+    private static int PickStorage(string brand, string cpu, int ramGb, string segment, Random random)
     {
+        int[] options = segment switch
+        {
+            "Budget" => new[] { 256, 512 },
+            "Mainstream" => new[] { 256, 512, 1024 },
+            "Gaming" => new[] { 512, 1024, 2048 },
+            "Ultrabook" => new[] { 256, 512, 1024 },
+            "Workstation" => new[] { 512, 1024, 2048 },
+            _ => new[] { 256, 512 }
+        };
+
         if (brand == "Apple")
         {
-            int[] appleStorage = { 256, 512, 1024, 2048 };
-            return appleStorage[random.Next(appleStorage.Length)];
+            options = new[] { 256, 512, 1024, 2048 };
         }
 
         if (cpu == "i3")
         {
-            int[] low = { 256, 512 };
-            return low[random.Next(low.Length)];
+            options = new[] { 256, 512 };
         }
 
-        if (ramGb >= 32)
+        if (ramGb >= 32 && !options.Contains(2048))
         {
-            int[] high = { 512, 1024, 2048 };
-            return high[random.Next(high.Length)];
+            options = options.Append(2048).Distinct().ToArray();
         }
 
-        return StorageOptions[random.Next(StorageOptions.Length)];
+        return options[random.Next(options.Length)];
     }
 
-    private static string PickGpu(string brand, string cpu, int ramGb, Random random)
+    private static string PickGpu(string brand, string cpu, int ramGb, string segment, Random random)
     {
         if (brand == "Apple")
         {
             return "Integrated";
         }
 
-        if (cpu == "i3")
+        return segment switch
         {
-            return "Integrated";
-        }
-
-        if (brand == "MSI")
-        {
-            return HighEndGpuOptions[random.Next(HighEndGpuOptions.Length)];
-        }
-
-        if (cpu == "i9" || ramGb >= 32)
-        {
-            return HighEndGpuOptions[random.Next(HighEndGpuOptions.Length)];
-        }
-
-        if (cpu == "i5" && ramGb <= 8)
-        {
-            return StandardGpuOptions[random.Next(3)];
-        }
-
-        return StandardGpuOptions[random.Next(StandardGpuOptions.Length)];
+            "Budget" => random.Next(100) < 80 ? "Integrated" : "RTX2050",
+            "Mainstream" => PickFrom(random, "Integrated", "RTX2050", "RTX3050"),
+            "Gaming" => PickFrom(random, "RTX3050", "RTX3060", "RTX4050", "RTX4060", "RTX4070", "RTX4080"),
+            "Ultrabook" => random.Next(100) < 90 ? "Integrated" : "RTX2050",
+            "Workstation" => PickFrom(random, "RTX3060", "RTX4050", "RTX4060", "RTX4070", "RTX4080"),
+            _ => "Integrated"
+        };
     }
+
+    private static float PickScreenSize(string segment, string brand, Random random)
+    {
+        float[] options = segment switch
+        {
+            "Budget" => new[] { 14.0f, 15.6f },
+            "Mainstream" => new[] { 14.0f, 15.6f, 16.0f },
+            "Gaming" => new[] { 15.6f, 16.0f, 17.3f },
+            "Ultrabook" => new[] { 13.3f, 14.0f },
+            "Workstation" => new[] { 15.6f, 16.0f, 17.3f },
+            _ => new[] { 15.6f }
+        };
+
+        if (brand == "Apple")
+        {
+            options = new[] { 13.6f, 14.2f, 16.2f };
+        }
+
+        return options[random.Next(options.Length)];
+    }
+
+    private static int PickRefreshRate(string segment, string gpu, Random random)
+    {
+        if (gpu == "Integrated")
+        {
+            return PickFrom(random, 60, 60, 60, 90, 120);
+        }
+
+        return segment switch
+        {
+            "Gaming" => PickFrom(random, 120, 144, 165, 240),
+            "Workstation" => PickFrom(random, 60, 120, 144),
+            _ => PickFrom(random, 60, 90, 120, 144)
+        };
+    }
+
+    private static int PickReleaseYear(bool conditionBiasNew, Random random)
+    {
+        int currentYear = DateTime.UtcNow.Year;
+
+        int[] years = conditionBiasNew
+            ? new[] { currentYear, currentYear - 1, currentYear - 2 }
+            : new[] { currentYear, currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4 };
+
+        return years[random.Next(years.Length)];
+    }
+
+    private static string PickCondition(string segment, Random random)
+    {
+        string[] options = segment switch
+        {
+            "Budget" => new[] { "Refurbished", "UsedGood", "UsedFair", "New" },
+            "Mainstream" => new[] { "New", "Refurbished", "UsedGood" },
+            "Gaming" => new[] { "New", "UsedGood", "Refurbished" },
+            "Ultrabook" => new[] { "New", "Refurbished", "UsedGood" },
+            "Workstation" => new[] { "New", "Refurbished", "UsedGood" },
+            _ => Conditions
+        };
+
+        return options[random.Next(options.Length)];
+    }
+
+    private static string PickFrom(Random random, params string[] options)
+        => options[random.Next(options.Length)];
+
+    private static int PickFrom(Random random, params int[] options)
+        => options[random.Next(options.Length)];
 }

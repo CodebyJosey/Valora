@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.ML.Data;
 
 namespace PriceWise.Infrastructure.ML.Models;
@@ -23,8 +22,23 @@ public sealed class LaptopPriceTrainingRow
     [LoadColumn(4)]
     public string Gpu { get; set; } = string.Empty;
 
-    // Label column
     [LoadColumn(5)]
+    public float ScreenSizeInch { get; set; }
+
+    [LoadColumn(6)]
+    public float RefreshRate { get; set; }
+
+    [LoadColumn(7)]
+    public float ReleaseYear { get; set; }
+
+    [LoadColumn(8)]
+    public string Condition { get; set; } = string.Empty;
+
+    [LoadColumn(9)]
+    public string Segment { get; set; } = string.Empty;
+
+    // Label column
+    [LoadColumn(10)]
     [ColumnName("Label")]
     public float Price { get; set; }
 }

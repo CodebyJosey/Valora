@@ -1,33 +1,22 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.ML;
+using PriceWise.Domain.Entities;
+using PriceWise.Infrastructure.ML.Definitions;
 using PriceWise.Infrastructure.ML.Models;
 using PriceWise.Infrastructure.ML.Training;
-using PriceWise.Infrastructure.ML.Prediction;
-using PriceWise.Infrastructure.ML.Definitions;
 
 namespace PriceWise.Api.Controllers;
 
-[ApiController]
-[Route("api/model")]
-public sealed class ModelController : ControllerBase
+public partial class ModelController : ControllerBase
 {
-    private readonly IHostEnvironment _env;
-    private readonly ITrainedModelProvider _modelProvider;
-
-    public ModelController(IHostEnvironment env, ITrainedModelProvider modelProvider)
-    {
-        _env = env;
-        _modelProvider = modelProvider;
-    }
-
     /// <summary>
     /// Trains a new ML model and saves it to artifacts/models/laptop-price-model.zip.
     /// Reloads the model in-memory afterwards so prediction uses the latest model without restarting.
     /// </summary>
-    [HttpPost("train/laptops")]
+    [HttpPost("laptops/train")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public IActionResult Train()
+    public IActionResult TrainLaptops()
     {
         string repoRoot = Directory.GetParent(_env.ContentRootPath)!.Parent!.FullName;
 
@@ -67,31 +56,11 @@ public sealed class ModelController : ControllerBase
     }
 
     /// <summary>
-    /// Returns basic info about the current model file (exists, size, last write).
-    /// </summary>
-    [HttpGet("info")]
-    public IActionResult Info()
-    {
-        string repoRoot = Directory.GetParent(_env.ContentRootPath)!.Parent!.FullName;
-        string modelPath = Path.Combine(repoRoot, "artifacts", "models", "laptop-price-model.zip");
-
-        FileInfo? file = new FileInfo(modelPath);
-
-        return Ok(new
-        {
-            modelPath,
-            exists = file.Exists,
-            sizeBytes = file.Exists ? file.Length : 0,
-            lastWriteUtc = file.Exists ? file.LastWriteTimeUtc : (DateTime?)null
-        });
-    }
-
-    /// <summary>
     /// Quick check: load first few rows from the dataset as ML.NET sees them.
     /// Helps debug CSV delimiter/column mapping issues.
     /// </summary>
-    [HttpGet("peek")]
-    public IActionResult Peek()
+    [HttpGet("laptops/peek")]
+    public IActionResult PeekLaptops()
     {
         string repoRoot = Directory.GetParent(_env.ContentRootPath)!.Parent!.FullName;
         string csvPath = Path.Combine(repoRoot, "data", "datasets", "laptops.csv");
@@ -119,25 +88,43 @@ public sealed class ModelController : ControllerBase
     /// Sanity prediction endpoint that uses the currently loaded model (via ITrainedModelProvider)
     /// and reads the Score directly from an IDataView (very reliable).
     /// </summary>
-    [HttpPost("sanity-predict")]
-    public IActionResult SanityPredict([FromBody] PredictPriceRequest request)
+    [HttpPost("laptops/sanity-predict")]
+    public IActionResult SanityPredictLaptops([FromBody] LaptopProductFeatures request)
     {
         if (request is null)
         {
             return BadRequest(Problem("Request body is required."));
         }
 
-        ITransformer model = _modelProvider.GetModel();
+        string repoRoot = Directory.GetParent(_env.ContentRootPath)!.Parent!.FullName;
+        string modelPath = Path.Combine(repoRoot, "artifacts", "models", "laptop-price-model.zip");
 
-        MLContext? ml = new MLContext(seed: 1);
+        if (!System.IO.File.Exists(modelPath))
+        {
+            return NotFound(new
+            {
+                message = "Laptop model not found.",
+                modelPath
+            });
+        }
 
-        LaptopPriceTrainingRow? input = new LaptopPriceTrainingRow
+        MLContext ml = new MLContext(seed: 1);
+
+        using FileStream fs = System.IO.File.OpenRead(modelPath);
+        ITransformer model = ml.Model.Load(fs, out _);
+
+        LaptopPriceTrainingRow input = new LaptopPriceTrainingRow
         {
             Brand = request.Brand.Trim(),
             Cpu = request.Cpu.Trim(),
             RamGb = request.RamGb,
             StorageGb = request.StorageGb,
             Gpu = request.Gpu.Trim().Replace(" ", ""),
+            ScreenSizeInch = request.ScreenSizeInch,
+            RefreshRate = request.RefreshRate,
+            ReleaseYear = request.ReleaseYear,
+            Condition = request.Condition.Trim(),
+            Segment = request.Segment.Trim(),
             Price = 0
         };
 
@@ -154,16 +141,4 @@ public sealed class ModelController : ControllerBase
             predictedPrice = score
         });
     }
-
-    private sealed class ScoreRow
-    {
-        public float Score { get; set; }
-    }
-
-    public sealed record PredictPriceRequest(
-        string Brand,
-        string Cpu,
-        float RamGb,
-        float StorageGb,
-        string Gpu);
 }
