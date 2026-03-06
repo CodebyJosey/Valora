@@ -3,7 +3,7 @@ namespace PriceWise.Domain.Entities;
 /// <summary>
 /// Represents the features of a product used for price prediction.
 /// </summary>
-public class ProductFeatures
+public class LaptopProductFeatures
 {
     /// <summary>
     /// Brand of the product.

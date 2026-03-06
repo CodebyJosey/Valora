@@ -16,7 +16,7 @@ public sealed class MlNetPricePredictor : IPricePredictor
         _modelProvider = modelProvider;
     }
 
-    public Task<float> PredictPriceAsync(ProductFeatures features)
+    public Task<float> PredictPriceAsync(LaptopProductFeatures features)
     {
         ITransformer? model = _modelProvider.GetModel();
 
@@ -31,6 +31,32 @@ public sealed class MlNetPricePredictor : IPricePredictor
             StorageGb = features.StorageGb,
             ScreenSizeInch = features.ScreenSizeInch,
             RefreshRate = features.RefreshRate,
+            ReleaseYear = features.ReleaseYear,
+            Price = 0
+        };
+
+        IDataView inputView = _ml.Data.LoadFromEnumerable(new[] { row });
+        IDataView scoredView = model.Transform(inputView);
+
+        float score = _ml.Data.CreateEnumerable<ScoreRow>(scoredView, reuseRowObject: false)
+            .First()
+            .Score;
+
+        return Task.FromResult(score);
+    }
+
+    public Task<float> PredictPriceAsync(PhoneProductFeatures features)
+    {
+        ITransformer? model = _modelProvider.GetModel();
+
+        PhonePriceTrainingRow? row = new PhonePriceTrainingRow
+        {
+            Brand = (features.Brand ?? string.Empty).Trim(),
+            ModelFamily = (features.ModelFamily ?? string.Empty).Trim(),
+            StorageGb = features.StorageGb,
+            RamGb = features.RamGb,
+            BatteryHealth = features.BatteryHealth,
+            Condition = (features.Condition ?? string.Empty).Trim(),
             ReleaseYear = features.ReleaseYear,
             Price = 0
         };

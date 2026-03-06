@@ -20,10 +20,10 @@ public sealed class PredictionsController : ControllerBase
     /// </summary>
     /// <param name="features">Laptop features used for prediction.</param>
     /// <returns>A predicted price (float) and some debug metadata.</returns>
-    [HttpPost("price")]
+    [HttpPost("price/laptops")]
     [ProducesResponseType(typeof(PredictionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<PredictionResponse>> PredictPrice([FromBody] ProductFeatures features)
+    public async Task<ActionResult<PredictionResponse>> PredictLaptopPrice([FromBody] LaptopProductFeatures features)
     {
         if (features is null)
         {
@@ -59,7 +59,7 @@ public sealed class PredictionsController : ControllerBase
         {
             PredictedPrice = predictedPrice,
             Predictor = _predictor.GetType().FullName ?? _predictor.GetType().Name,
-            Input = new ProductFeatures
+            Input = new LaptopProductFeatures
             {
                 Brand = features.Brand,
                 Cpu = features.Cpu,
@@ -79,6 +79,6 @@ public sealed class PredictionsController : ControllerBase
     {
         public float PredictedPrice { get; init; }
         public string Predictor { get; init; } = string.Empty;
-        public ProductFeatures Input { get; init; } = new();
+        public LaptopProductFeatures Input { get; init; } = new();
     }
 }

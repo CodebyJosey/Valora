@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.ML.Data;
 
 namespace PriceWise.Infrastructure.ML.Models;

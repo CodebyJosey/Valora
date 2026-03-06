@@ -7,5 +7,6 @@ namespace PriceWise.Application.Interfaces;
 /// </summary>
 public interface IPricePredictor
 {
-    Task<float> PredictPriceAsync(ProductFeatures features);
+    Task<float> PredictPriceAsync(LaptopProductFeatures features);
+    Task<float> PredictPriceAsync(PhoneProductFeatures features);
 }
