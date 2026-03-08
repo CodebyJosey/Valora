@@ -41,6 +41,16 @@ public sealed class ListingResponse
     public decimal? PredictedPrice { get; init; }
 
     /// <summary>
+    /// Gets or sets the sold price.
+    /// </summary>
+    public decimal? SoldPrice { get; init; }
+
+    /// <summary>
+    /// Gets or sets the sold timestamp.
+    /// </summary>
+    public DateTime? SoldAtUtc { get; init; }
+
+    /// <summary>
     /// Gets or sets the listing status.
     /// </summary>
     public required string Status { get; init; }

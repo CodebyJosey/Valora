@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Valora.Application.Abstractions.Admin;
 using Valora.Application.Contracts.Admin;
 using Valora.Domain.Constants;
 using Valora.Infrastructure.Persistence;
@@ -19,16 +20,19 @@ public sealed class AdminController : ControllerBase
 {
     private readonly ValoraDbContext _dbContext;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IModelPerformanceService _modelPerformanceService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AdminController"/> class.
     /// </summary>
     public AdminController(
         ValoraDbContext dbContext,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager,
+        IModelPerformanceService modelPerformanceService)
     {
         _dbContext = dbContext;
         _userManager = userManager;
+        _modelPerformanceService = modelPerformanceService;
     }
 
     /// <summary>
@@ -317,5 +321,57 @@ public sealed class AdminController : ControllerBase
             count = logs.Length,
             logs
         });
+    }
+
+    /// <summary>
+    /// Gets the model performance overview.
+    /// </summary>
+    [HttpGet("model-performance/overview")]
+    [ProducesResponseType(typeof(ModelPerformanceOverviewResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetModelPerformanceOverview(CancellationToken cancellationToken)
+    {
+        ModelPerformanceOverviewResponse response =
+            await _modelPerformanceService.GetOverviewAsync(cancellationToken);
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Gets model performance for a category.
+    /// </summary>
+    [HttpGet("model-performance/{category}")]
+    [ProducesResponseType(typeof(ModelPerformanceCategoryResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetModelPerformanceByCategory(
+        [FromRoute] string category,
+        CancellationToken cancellationToken)
+    {
+        ModelPerformanceCategoryResponse? response =
+            await _modelPerformanceService.GetCategoryAsync(category, cancellationToken);
+
+        if (response is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Model performance not found",
+                Detail = $"No sold listing performance data exists yet for category '{category}'.",
+                Status = StatusCodes.Status404NotFound
+            });
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Gets recent listing-level model performance rows.
+    /// </summary>
+    [HttpGet("model-performance/listings")]
+    [ProducesResponseType(typeof(IReadOnlyCollection<ModelPerformanceListingResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetModelPerformanceListings(CancellationToken cancellationToken)
+    {
+        IReadOnlyCollection<ModelPerformanceListingResponse> response =
+            await _modelPerformanceService.GetRecentListingsAsync(cancellationToken);
+
+        return Ok(response);
     }
 }

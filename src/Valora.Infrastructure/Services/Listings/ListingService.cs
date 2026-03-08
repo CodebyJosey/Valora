@@ -55,6 +55,8 @@ public sealed class ListingService : IListingService
             CategoryKey = request.CategoryKey.Trim(),
             AskingPrice = request.AskingPrice,
             PredictedPrice = null,
+            SoldPrice = null,
+            SoldAtUtc = null,
             FeaturesJson = request.FeaturesJson,
             Status = ListingStatuses.Draft,
             CreatedAtUtc = DateTime.UtcNow,
@@ -136,6 +138,11 @@ public sealed class ListingService : IListingService
             return null;
         }
 
+        if (listing.Status == ListingStatuses.Sold || listing.Status == ListingStatuses.Archived)
+        {
+            throw new ArgumentException("Sold or archived listings cannot be updated.");
+        }
+
         EnsureFeaturesJsonMatchesCategory(request.FeaturesJson, listing.CategoryKey);
 
         listing.Title = request.Title.Trim();
@@ -190,6 +197,11 @@ public sealed class ListingService : IListingService
         if (listing is null || !CanModify(listing, actorUserId, isAdmin))
         {
             return null;
+        }
+
+        if (listing.Status == ListingStatuses.Sold || listing.Status == ListingStatuses.Archived)
+        {
+            throw new ArgumentException("Sold or archived listings cannot be predicted.");
         }
 
         IPricePredictionCategory category = _categoryRegistry.GetRequired(listing.CategoryKey);
@@ -260,6 +272,11 @@ public sealed class ListingService : IListingService
             return null;
         }
 
+        if (listing.Status == ListingStatuses.Sold || listing.Status == ListingStatuses.Archived)
+        {
+            throw new ArgumentException("Sold or archived listings cannot be published.");
+        }
+
         if (listing.AskingPrice <= 0)
         {
             throw new ArgumentException("A published listing must have an asking price greater than zero.");
@@ -288,10 +305,74 @@ public sealed class ListingService : IListingService
             return null;
         }
 
+        if (listing.Status == ListingStatuses.Sold || listing.Status == ListingStatuses.Archived)
+        {
+            throw new ArgumentException("Sold or archived listings cannot be unpublished.");
+        }
+
         listing.Status = listing.PredictedPrice.HasValue
             ? ListingStatuses.Predicted
             : ListingStatuses.Draft;
 
+        listing.UpdatedAtUtc = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Map(listing);
+    }
+
+    /// <inheritdoc />
+    public async Task<ListingResponse?> MarkAsSoldAsync(
+        Guid listingId,
+        Guid actorUserId,
+        bool isAdmin,
+        decimal soldPrice,
+        CancellationToken cancellationToken = default)
+    {
+        if (soldPrice <= 0)
+        {
+            throw new ArgumentException("SoldPrice must be greater than zero.");
+        }
+
+        Listing? listing = await _dbContext.Listings
+            .FirstOrDefaultAsync(x => x.Id == listingId, cancellationToken);
+
+        if (listing is null || !CanModify(listing, actorUserId, isAdmin))
+        {
+            return null;
+        }
+
+        if (listing.Status == ListingStatuses.Archived)
+        {
+            throw new ArgumentException("Archived listings cannot be marked as sold.");
+        }
+
+        listing.SoldPrice = soldPrice;
+        listing.SoldAtUtc = DateTime.UtcNow;
+        listing.Status = ListingStatuses.Sold;
+        listing.UpdatedAtUtc = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Map(listing);
+    }
+
+    /// <inheritdoc />
+    public async Task<ListingResponse?> ArchiveAsync(
+        Guid listingId,
+        Guid actorUserId,
+        bool isAdmin,
+        CancellationToken cancellationToken = default)
+    {
+        Listing? listing = await _dbContext.Listings
+            .FirstOrDefaultAsync(x => x.Id == listingId, cancellationToken);
+
+        if (listing is null || !CanModify(listing, actorUserId, isAdmin))
+        {
+            return null;
+        }
+
+        listing.Status = ListingStatuses.Archived;
         listing.UpdatedAtUtc = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -420,6 +501,8 @@ public sealed class ListingService : IListingService
             CategoryKey = listing.CategoryKey,
             AskingPrice = listing.AskingPrice,
             PredictedPrice = listing.PredictedPrice,
+            SoldPrice = listing.SoldPrice,
+            SoldAtUtc = listing.SoldAtUtc,
             Status = listing.Status,
             FeaturesJson = listing.FeaturesJson,
             CreatedAtUtc = listing.CreatedAtUtc,
