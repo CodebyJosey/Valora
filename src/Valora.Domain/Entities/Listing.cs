@@ -42,6 +42,16 @@ public class Listing
     public decimal? PredictedPrice { get; set; }
 
     /// <summary>
+    /// Gets or sets the final sold price.
+    /// </summary>
+    public decimal? SoldPrice { get; set; }
+
+    /// <summary>
+    /// Gets or sets the UTC timestamp when the listing was sold.
+    /// </summary>
+    public DateTime? SoldAtUtc { get; set; }
+
+    /// <summary>
     /// Gets or sets the serialized feature payload in JSON format.
     /// </summary>
     public string FeaturesJson { get; set; } = string.Empty;

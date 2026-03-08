@@ -82,4 +82,23 @@ public interface IListingService
         Guid actorUserId,
         bool isAdmin,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Marks a listing as sold.
+    /// </summary>
+    Task<ListingResponse?> MarkAsSoldAsync(
+        Guid listingId,
+        Guid actorUserId,
+        bool isAdmin,
+        decimal soldPrice,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Archives a listing.
+    /// </summary>
+    Task<ListingResponse?> ArchiveAsync(
+        Guid listingId,
+        Guid actorUserId,
+        bool isAdmin,
+        CancellationToken cancellationToken = default);
 }

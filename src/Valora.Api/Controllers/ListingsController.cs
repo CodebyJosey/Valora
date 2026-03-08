@@ -291,20 +291,105 @@ public sealed class ListingsController : ControllerBase
     [HttpPost("{id:guid}/unpublish")]
     [ProducesResponseType(typeof(ListingResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Unpublish([FromRoute] Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            Guid userId = GetRequiredUserId();
+            bool isAdmin = User.IsInRole(ApplicationRoles.Admin);
+
+            ListingResponse? response =
+                await _listingService.UnpublishAsync(id, userId, isAdmin, cancellationToken);
+
+            if (response is null)
+            {
+                return NotFound(new ProblemDetails
+                {
+                    Title = "Listing not found",
+                    Detail = $"No unpublishable listing was found with id '{id}'.",
+                    Status = StatusCodes.Status404NotFound
+                });
+            }
+
+            return Ok(response);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Unpublish failed",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+    }
+
+    /// <summary>
+    /// Marks a listing as sold.
+    /// </summary>
+    [Authorize]
+    [HttpPost("{id:guid}/mark-as-sold")]
+    [ProducesResponseType(typeof(ListingResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> MarkAsSold(
+        [FromRoute] Guid id,
+        [FromBody] MarkListingAsSoldRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            Guid userId = GetRequiredUserId();
+            bool isAdmin = User.IsInRole(ApplicationRoles.Admin);
+
+            ListingResponse? response =
+                await _listingService.MarkAsSoldAsync(id, userId, isAdmin, request.SoldPrice, cancellationToken);
+
+            if (response is null)
+            {
+                return NotFound(new ProblemDetails
+                {
+                    Title = "Listing not found",
+                    Detail = $"No sellable listing was found with id '{id}'.",
+                    Status = StatusCodes.Status404NotFound
+                });
+            }
+
+            return Ok(response);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Mark as sold failed",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+    }
+
+    /// <summary>
+    /// Archives a listing.
+    /// </summary>
+    [Authorize]
+    [HttpPost("{id:guid}/archive")]
+    [ProducesResponseType(typeof(ListingResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Archive([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         Guid userId = GetRequiredUserId();
         bool isAdmin = User.IsInRole(ApplicationRoles.Admin);
 
         ListingResponse? response =
-            await _listingService.UnpublishAsync(id, userId, isAdmin, cancellationToken);
+            await _listingService.ArchiveAsync(id, userId, isAdmin, cancellationToken);
 
         if (response is null)
         {
             return NotFound(new ProblemDetails
             {
                 Title = "Listing not found",
-                Detail = $"No unpublishable listing was found with id '{id}'.",
+                Detail = $"No archivable listing was found with id '{id}'.",
                 Status = StatusCodes.Status404NotFound
             });
         }

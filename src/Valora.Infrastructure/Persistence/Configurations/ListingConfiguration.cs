@@ -33,6 +33,9 @@ public sealed class ListingConfiguration : IEntityTypeConfiguration<Listing>
         builder.Property(x => x.PredictedPrice)
             .HasPrecision(18, 2);
 
+        builder.Property(x => x.SoldPrice)
+            .HasPrecision(18, 2);
+
         builder.Property(x => x.FeaturesJson)
             .IsRequired();
 
@@ -44,5 +47,6 @@ public sealed class ListingConfiguration : IEntityTypeConfiguration<Listing>
         builder.HasIndex(x => x.CategoryKey);
         builder.HasIndex(x => x.Status);
         builder.HasIndex(x => x.CreatedAtUtc);
+        builder.HasIndex(x => x.SoldAtUtc);
     }
 }
