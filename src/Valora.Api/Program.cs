@@ -5,10 +5,24 @@ using Valora.Api.Middleware;
 using Valora.Infrastructure.Persistence;
 using Valora.Infrastructure.Persistence.Seed;
 
-WebApplicationBuilder? builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy
+            .WithOrigins(
+                "http://localhost:3000",
+                "http://127.0.0.1:3000")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
@@ -46,7 +60,7 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddValoraPersistence(builder.Configuration);
 builder.Services.AddValoraServices(builder.Environment.ContentRootPath);
 
-WebApplication? app = builder.Build();
+WebApplication app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
@@ -54,14 +68,18 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseMiddleware<RequestLoggingMiddleware>();
 
+// Laat dit voorlopig staan, maar als jij alleen op http draait
+// en later rare redirect-warnings ziet, kunnen we dit tijdelijk uitzetten.
 app.UseHttpsRedirection();
+
+app.UseCors("Frontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseMiddleware<RequestLoggingMiddleware>();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.MapControllers();
 
@@ -74,7 +92,6 @@ static async Task ApplyDatabaseMigrationsAsync(WebApplication app)
 {
     using IServiceScope scope = app.Services.CreateScope();
     ValoraDbContext dbContext = scope.ServiceProvider.GetRequiredService<ValoraDbContext>();
-
     await dbContext.Database.MigrateAsync();
 }
 
